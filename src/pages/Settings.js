@@ -7,6 +7,8 @@ import {
 import Sidebar from "../components/Sidebar";
 import TopNavbar from "../components/TopNavbar";
 
+import { useNavigate } from "react-router-dom";
+
 import { ThemeContext } from "../context/ThemeContext";
 
 import {
@@ -67,6 +69,8 @@ const [isEditing, setIsEditing] = useState(false);
 const [showHelp, setShowHelp] = useState(false);
 const [showDeleteModal, setShowDeleteModal] = useState(false);
 
+const navigate = useNavigate();
+
 const [exportType, setExportType] =
   useState("all");
 
@@ -76,9 +80,8 @@ const [exportType, setExportType] =
   const [transactions, setTransactions] =
     useState([]);
 
-  const [filteredTransactions,
-    setFilteredTransactions] =
-    useState([]);
+  const [, setFilteredTransactions] =
+  useState([]);
 
   const [budgets, setBudgets] =
     useState([]);
@@ -435,47 +438,210 @@ const [exportType, setExportType] =
       }
     };
 
-  // =========================
-// EXPORT EXCEL (MULTI SHEET)
-// =========================
-const exportCSV = () => {
-  const allData = filteredTransactions.map((t) => ({
-    Title: t.title,
-    Amount: t.amount,
-    Category: t.category,
-    Type: t.type,
-    Date: t.date,
-    Year: new Date(t.date).getFullYear(),
-    Month: new Date(t.date).toLocaleString("default", { month: "short" }),
-  }));
 
-  const wb = XLSX.utils.book_new();
+        // EXPORT EXCEL (MULTI SHEET)
 
-  // 1. ALL TRANSACTIONS
-  const wsAll = XLSX.utils.json_to_sheet(allData);
-  XLSX.utils.book_append_sheet(wb, wsAll, "All Transactions");
+        const exportCSV = () => {
+          let exportData = [...transactions];
 
-  // 2. YEAR WISE SHEETS
-  const years = [...new Set(allData.map((t) => t.Year))];
 
-  years.forEach((year) => {
-    const yearData = allData.filter((t) => t.Year === year);
-    const wsYear = XLSX.utils.json_to_sheet(yearData);
-    XLSX.utils.book_append_sheet(wb, wsYear, `${year}`);
-  });
+          exportData.sort(
+            (a, b) =>
+              new Date(a.date) -
+              new Date(b.date)
+          );
 
-  // 3. MONTH-YEAR SHEET
-  const wsMonthYear = XLSX.utils.json_to_sheet(
-    allData.map((t) => ({
-      ...t,
-      MonthYear: `${t.Month}-${t.Year}`,
-    }))
-  );
+          // YEAR FILTER
+          if (
+            (exportType === "year" ||
+              exportType === "month") &&
+            selectedYear !== "All"
+          ) {
+            exportData = exportData.filter(
+              (t) =>
+                new Date(t.date)
+                  .getFullYear()
+                  .toString() === selectedYear
+            );
+          }
 
-  XLSX.utils.book_append_sheet(wb, wsMonthYear, "Month-Year");
+          // MONTH FILTER
+          if (
+            exportType === "month" &&
+            selectedMonth !== "All"
+          ) {
+            exportData = exportData.filter(
+              (t) =>
+                new Date(t.date).toLocaleString(
+                  "default",
+                  {
+                    month: "short",
+                  }
+                ) === selectedMonth
+            );
+          }
 
-  XLSX.writeFile(wb, "Transactions_Report.xlsx");
-};
+          const formattedData =
+            exportData.map((t) => ({
+              Title: t.title || "",
+              Amount: Number(t.amount || 0),
+              Category: t.category || "",
+              Type: t.type || "",
+              Date: t.date || "",
+              Year: new Date(
+                t.date
+              ).getFullYear(),
+              Month: new Date(
+                t.date
+              ).toLocaleString("default", {
+                month: "short",
+              }),
+            }));
+
+          const wb = XLSX.utils.book_new();
+
+          // ==========================
+          // ALL DATA
+          // ==========================
+          if (exportType === "all") {
+            const wsAll =
+              XLSX.utils.json_to_sheet(
+                formattedData
+              );
+
+            wsAll["!cols"] = [
+              { wch: 25 },
+              { wch: 15 },
+              { wch: 20 },
+              { wch: 15 },
+              { wch: 18 },
+              { wch: 10 },
+              { wch: 10 },
+            ];
+
+            XLSX.utils.book_append_sheet(
+              wb,
+              wsAll,
+              "All Transactions"
+            );
+
+            const years = [
+              ...new Set(
+                formattedData.map(
+                  (t) => t.Year
+                )
+              ),
+            ];
+
+            years.forEach((year) => {
+
+              const yearData =
+                formattedData
+                  .filter(
+                    (t) =>
+                      t.Year === year
+                  )
+                  .sort(
+                    (a, b) =>
+                      new Date(a.Date) -
+                      new Date(b.Date)
+                  );
+
+              const wsYear =
+                XLSX.utils.json_to_sheet(
+                  yearData
+                );
+
+              wsYear["!cols"] = [
+                { wch: 25 },
+                { wch: 15 },
+                { wch: 20 },
+                { wch: 15 },
+                { wch: 18 },
+                { wch: 10 },
+                { wch: 10 },
+              ];
+
+              XLSX.utils.book_append_sheet(
+                wb,
+                wsYear,
+                `${year}`
+              );
+
+            });
+
+            XLSX.writeFile(
+              wb,
+              "All_Transactions_Report.xlsx"
+            );
+
+            return;
+          }
+
+          // ==========================
+          // YEAR EXPORT
+          // ==========================
+          if (exportType === "year") {
+            const ws =
+              XLSX.utils.json_to_sheet(
+                formattedData
+              );
+
+            ws["!cols"] = [
+              { wch: 25 },
+              { wch: 15 },
+              { wch: 20 },
+              { wch: 15 },
+              { wch: 18 },
+              { wch: 10 },
+              { wch: 10 },
+            ];
+
+            XLSX.utils.book_append_sheet(
+              wb,
+              ws,
+              selectedYear
+            );
+
+            XLSX.writeFile(
+              wb,
+              `Transactions_${selectedYear}.xlsx`
+            );
+
+            return;
+          }
+
+          // ==========================
+          // MONTH EXPORT
+          // ==========================
+          if (exportType === "month") {
+            const ws =
+              XLSX.utils.json_to_sheet(
+                formattedData
+              );
+
+            ws["!cols"] = [
+              { wch: 25 },
+              { wch: 15 },
+              { wch: 20 },
+              { wch: 15 },
+              { wch: 18 },
+              { wch: 10 },
+              { wch: 10 },
+            ];
+
+            XLSX.utils.book_append_sheet(
+              wb,
+              ws,
+              `${selectedMonth}-${selectedYear}`
+            );
+
+            XLSX.writeFile(
+              wb,
+              `Transactions_${selectedMonth}_${selectedYear}.xlsx`
+            );
+          }
+        };
 
   // =========================
   // BACKUP DOWNLOAD
@@ -637,6 +803,8 @@ const exportCSV = () => {
           "Account Deleted Successfully"
         );
 
+        navigate("/signup");
+
       } catch (error) {
 
         alert(
@@ -647,6 +815,20 @@ const exportCSV = () => {
 
     };
 
+  const currentYear =
+  new Date().getFullYear();
+
+const years =
+  Array.from(
+    {
+      length:
+        currentYear - 2023 + 1,
+    },
+    (_, i) =>
+      (
+        2023 + i
+      ).toString()
+  );
 
      return (
   <div className={darkMode ? "dashboard dark" : "dashboard"}>
@@ -873,10 +1055,18 @@ const exportCSV = () => {
           value={selectedYear}
           onChange={(e) => setSelectedYear(e.target.value)}
         >
-          <option>2023</option>
-          <option>2024</option>
-          <option>2025</option>
-          <option>2026</option>
+          <option value="All">
+            Select Year
+          </option>
+
+          {years.map((year) => (
+            <option
+              key={year}
+              value={year}
+            >
+              {year}
+            </option>
+          ))}
         </select>
       )}
 
@@ -962,20 +1152,23 @@ const exportCSV = () => {
             All data will be removed permanently.
             </p>
 
-            <button
-            onClick={() =>
-            setShowDeleteModal(false)
-            }
-            >
-            Cancel
-            </button>
+            <div className="modal-actions">
+              <button
+                className="cancel-btn"
+                onClick={() =>
+                  setShowDeleteModal(false)
+                }
+              >
+                Cancel
+              </button>
 
-            <button
-            className="delete-btn"
-            onClick={deleteAccount}
-            >
-            Delete Permanently
-            </button>
+              <button
+                className="delete-btn"
+                onClick={deleteAccount}
+              >
+                Delete Permanently
+              </button>
+            </div>
 
             </div>
 
@@ -1180,6 +1373,25 @@ button:hover {
 
 .profile-actions {
   margin-top: 25px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.modal-actions button {
+  min-width: 170px;
+}
+
+.cancel-btn {
+  background: #2563eb;
+}
+
+.cancel-btn:hover {
+  background: #1d4ed8;
 }
 
 /* TEXT */
