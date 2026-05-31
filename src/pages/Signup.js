@@ -114,17 +114,20 @@ function Signup() {
           />
 
           <button type="submit" disabled={loading}>
-            {loading ? "Creating..." : "Signup"}
-          </button>
+              {loading ? "Creating..." : "Signup"}
+            </button>
 
-          <button
-            type="button"
-            className="google-btn"
-            onClick={handleGoogleSignup}
-          >
-            Continue with Google
-          </button>
+            <div className="divider">
+              <span>OR</span>
+            </div>
 
+            <button
+              type="button"
+              className="google-btn"
+              onClick={handleGoogleSignup}
+            >
+              Continue with Google
+            </button>
           <p>
             Already have account? <Link to="/">Login</Link>
           </p>

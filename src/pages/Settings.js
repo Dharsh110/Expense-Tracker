@@ -837,10 +837,13 @@ const exportCSV = () => {
         </p>
 
         <div className="appearance-row">
-          <button onClick={toggleTheme}>
-            {darkMode ? <FaSun /> : <FaMoon />}
-            Toggle Theme
-          </button>
+          <button
+        type="button"
+        className="global-theme-btn"
+        onClick={toggleTheme}
+      >
+        {darkMode ? <FaSun size={20} /> : <FaMoon size={20} />}
+      </button>
         </div>
       </div>
 

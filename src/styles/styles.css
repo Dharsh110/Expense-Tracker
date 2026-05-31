@@ -3571,3 +3571,34 @@ body.dark-theme {
   font-size: 26px;
   line-height: 1;
 }
+
+
+.divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 15px 0;
+}
+
+.divider::before,
+.divider::after {
+  content: "";
+  flex: 1;
+  border-bottom: 1px solid #ccc;
+}
+
+.divider span {
+  padding: 0 10px;
+  color: #777;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.dark .divider::before,
+.dark .divider::after {
+  border-bottom: 1px solid #555;
+}
+
+.dark .divider span {
+  color: #ddd;
+}
