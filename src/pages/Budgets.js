@@ -22,6 +22,7 @@ import {
   addUserDocument,
   deleteUserDocument,
   updateUserDocument,
+  getUserProfile,
 } from "../services/firestoreData";
 
 import useFirestoreCollection from "../hooks/useFirestoreCollection";
@@ -51,7 +52,9 @@ function Budgets() {
 
   // NEW STATES
   const [selectedMonth, setSelectedMonth] = useState("");
-  const [selectedYear, setSelectedYear] = useState("");
+  const [selectedYear, setSelectedYear] = useState(
+    new Date().getFullYear()
+  );
 
   const {
     items: budgets,
@@ -75,6 +78,10 @@ function Budgets() {
   // REPORT NARROWING (separate from Add Budget form's month/year)
   const [reportMonth, setReportMonth] = useState("");
   const [reportYear, setReportYear] = useState("");
+
+  // PAGINATION
+  const [currentPage, setCurrentPage] = useState(1);
+  const rowsPerPage = 10;
 
   const categories = [
     "Food",
@@ -125,11 +132,15 @@ function Budgets() {
       return;
     }
 
-    // YEAR REQUIRED FOR YEARLY
-    if (budgetType === "Yearly" && !selectedYear) {
+    // YEAR REQUIRED FOR ALL BUDGET TYPES
+    if (!selectedYear) {
       toast.error("Please select year");
       return;
     }
+
+    // WEEKLY BUDGETS HAVE NO MONTH — NEVER PERSIST A STALE ONE
+    const monthToSave =
+      budgetType === "Weekly" ? "" : selectedMonth;
 
     try {
       if (editingId) {
@@ -141,7 +152,7 @@ function Budgets() {
             category,
             amount: Number(amount),
             type: budgetType,
-            month: selectedMonth,
+            month: monthToSave,
             year: selectedYear,
           }
         );
@@ -155,7 +166,7 @@ function Budgets() {
           category,
           amount: Number(amount),
           type: budgetType,
-          month: selectedMonth,
+          month: monthToSave,
           year: selectedYear,
         };
 
@@ -168,15 +179,13 @@ function Budgets() {
           budgetType === "Yearly"
             ? `${selectedMonth} ${selectedYear}`
             : budgetType === "Monthly"
-            ? selectedMonth
-            : "this week";
+            ? `${selectedMonth} ${selectedYear}`
+            : `this week (${selectedYear})`;
 
-        const savedSettings = JSON.parse(
-          localStorage.getItem("settings")
-        );
+        const profile = await getUserProfile().catch(() => null);
 
         const notificationsOn =
-          !savedSettings || savedSettings.notifications !== false;
+          !profile || profile.notificationsEnabled !== false;
 
         if (notificationsOn) {
           await addUserDocument("notifications", {
@@ -197,7 +206,7 @@ function Budgets() {
       setAmount("");
       setBudgetType("Monthly");
       setSelectedMonth("");
-      setSelectedYear("");
+      setSelectedYear(new Date().getFullYear());
     } catch (error) {
       toast.error(error.message);
     }
@@ -218,7 +227,7 @@ function Budgets() {
     setAmount(item.amount);
     setBudgetType(item.type);
     setSelectedMonth(item.month || "");
-    setSelectedYear(item.year || "");
+    setSelectedYear(item.year || new Date().getFullYear());
   };
 
   // FILTERED DATA
@@ -237,6 +246,13 @@ function Budgets() {
 
     return true;
   });
+
+  const totalPages = Math.ceil(filteredBudgets.length / rowsPerPage) || 1;
+
+  const paginatedBudgets = filteredBudgets.slice(
+    (currentPage - 1) * rowsPerPage,
+    currentPage * rowsPerPage
+  );
 
   const buildReportRows = () =>
     filteredBudgets.map((item, index) => {
@@ -470,12 +486,14 @@ function Budgets() {
                 value={
                   budgetType
                 }
-                onChange={(e) =>
-                  setBudgetType(
-                    e.target
-                      .value
-                  )
-                }
+                onChange={(e) => {
+                  const nextType = e.target.value;
+                  setBudgetType(nextType);
+
+                  if (nextType === "Weekly") {
+                    setSelectedMonth("");
+                  }
+                }}
               >
 
                 <option value="Weekly">
@@ -553,59 +571,48 @@ function Budgets() {
               )
             }
 
-            {/* YEAR */}
+            {/* YEAR (always shown — Weekly, Monthly, and Yearly all store a year) */}
 
-            {
-              budgetType ===
-                "Yearly" && (
+            <div className="form-group">
 
-                <div className="form-group">
+              <label>
+                Select Year
+              </label>
 
-                  <label>
-                    Select Year
-                  </label>
+              <select
+                value={
+                  selectedYear
+                }
+                onChange={(e) =>
+                  setSelectedYear(
+                    Number(e.target.value)
+                  )
+                }
+              >
 
-                  <select
-                    value={
-                      selectedYear
-                    }
-                    onChange={(e) =>
-                      setSelectedYear(
-                        e.target
-                          .value
-                      )
-                    }
-                  >
-
-                    <option value="">
-                      Select Year
-                    </option>
-
-                    {
-                      years.map(
-                        (
-                          year,
+                {
+                  years.map(
+                    (
+                      year,
+                      index
+                    ) => (
+                      <option
+                        key={
                           index
-                        ) => (
-                          <option
-                            key={
-                              index
-                            }
-                            value={
-                              year
-                            }
-                          >
-                            {year}
-                          </option>
-                        )
-                      )
-                    }
+                        }
+                        value={
+                          year
+                        }
+                      >
+                        {year}
+                      </option>
+                    )
+                  )
+                }
 
-                  </select>
+              </select>
 
-                </div>
-              )
-            }
+            </div>
 
           </div>
 
@@ -636,6 +643,7 @@ function Budgets() {
                 setFilterType("All");
                 setReportMonth("");
                 setReportYear("");
+                setCurrentPage(1);
               }}
             >
               All
@@ -647,6 +655,7 @@ function Budgets() {
                 setFilterType("Weekly");
                 setReportMonth("");
                 setReportYear("");
+                setCurrentPage(1);
               }}
             >
               This Week
@@ -657,6 +666,7 @@ function Budgets() {
               onClick={() => {
                 setFilterType("Monthly");
                 setReportYear("");
+                setCurrentPage(1);
               }}
             >
               Month
@@ -667,6 +677,7 @@ function Budgets() {
               onClick={() => {
                 setFilterType("Yearly");
                 setReportMonth("");
+                setCurrentPage(1);
               }}
             >
               Year
@@ -676,7 +687,10 @@ function Budgets() {
               <>
                 <select
                   value={reportMonth}
-                  onChange={(e) => setReportMonth(e.target.value)}
+                  onChange={(e) => {
+                    setReportMonth(e.target.value);
+                    setCurrentPage(1);
+                  }}
                 >
                   <option value="">All Months</option>
                   {months.map((month, index) => (
@@ -688,7 +702,10 @@ function Budgets() {
 
                 <select
                   value={reportYear}
-                  onChange={(e) => setReportYear(e.target.value)}
+                  onChange={(e) => {
+                    setReportYear(e.target.value);
+                    setCurrentPage(1);
+                  }}
                 >
                   <option value="">All Years</option>
                   {years.map((year, index) => (
@@ -703,7 +720,10 @@ function Budgets() {
             {filterType === "Yearly" && (
               <select
                 value={reportYear}
-                onChange={(e) => setReportYear(e.target.value)}
+                onChange={(e) => {
+                  setReportYear(e.target.value);
+                  setCurrentPage(1);
+                }}
               >
                 <option value="">All Years</option>
                 {years.map((year, index) => (
@@ -771,13 +791,13 @@ function Budgets() {
               </thead>
 
               <tbody>
-                {filteredBudgets.map((item, index) => {
+                {paginatedBudgets.map((item, index) => {
                   const spent = calculateSpent(transactions, item.category, item.type);
                   const remaining = item.amount - spent;
 
                   return (
                     <tr key={item.id}>
-                      <td>{index + 1}</td>
+                      <td>{(currentPage - 1) * rowsPerPage + index + 1}</td>
                       <td>{item.category}</td>
                       <td>{item.type}</td>
 
@@ -852,8 +872,88 @@ function Budgets() {
               </tbody>
             </table>
           )}
+
+          {/* PAGINATION */}
+          {filteredBudgets.length > rowsPerPage && (
+            <div className="pagination-bar">
+              <button
+                className="page-nav-btn"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+              >
+                Prev
+              </button>
+
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                (pageNum) => (
+                  <button
+                    key={pageNum}
+                    className={
+                      currentPage === pageNum
+                        ? "page-number active-page"
+                        : "page-number"
+                    }
+                    onClick={() => setCurrentPage(pageNum)}
+                  >
+                    {pageNum}
+                  </button>
+                )
+              )}
+
+              <button
+                className="page-nav-btn"
+                onClick={() =>
+                  setCurrentPage((p) => Math.min(totalPages, p + 1))
+                }
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </button>
+            </div>
+          )}
         </div>
       </div>
+
+      <style>
+        {`
+          .pagination-bar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 20px;
+          }
+
+          .page-nav-btn,
+          .page-number {
+            border: 1px solid ${darkMode ? "#334155" : "#e5e7eb"};
+            background: ${darkMode ? "#1e293b" : "white"};
+            color: ${darkMode ? "#e2e8f0" : "#111827"};
+            padding: 8px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+          }
+
+          .page-number {
+            padding: 8px 13px;
+            min-width: 38px;
+          }
+
+          .page-nav-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+          }
+
+          .page-number.active-page {
+            background: #4f46e5;
+            border-color: #4f46e5;
+            color: white;
+          }
+        `}
+      </style>
     </div>
   );
 }

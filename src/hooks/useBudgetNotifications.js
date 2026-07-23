@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import {
   addUserDocument,
   updateUserDocument,
+  getUserProfile,
 } from "../services/firestoreData";
 
 import { calculateSpent } from "../utils/budgetUtils";
@@ -27,9 +28,13 @@ function buildMessage(budget, key, remaining) {
   return `Your ${budget.category} budget has ₹${remaining} remaining out of ₹${budget.amount} (down to the ₹${key} mark).`;
 }
 
-function notificationsEnabled() {
-  const saved = JSON.parse(localStorage.getItem("settings"));
-  return !saved || saved.notifications !== false;
+async function notificationsEnabled() {
+  try {
+    const profile = await getUserProfile();
+    return !profile || profile.notificationsEnabled !== false;
+  } catch (error) {
+    return true;
+  }
 }
 
 function useBudgetNotifications(budgets, transactions) {
@@ -38,7 +43,9 @@ function useBudgetNotifications(budgets, transactions) {
   useEffect(() => {
     if (!budgets || budgets.length === 0) return;
 
-    if (!notificationsEnabled()) return;
+    (async () => {
+
+    if (!(await notificationsEnabled())) return;
 
     budgets.forEach(async (budget) => {
       const spent = calculateSpent(
@@ -98,6 +105,8 @@ function useBudgetNotifications(budgets, transactions) {
         });
       }
     });
+
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [budgets, transactions]);
 }

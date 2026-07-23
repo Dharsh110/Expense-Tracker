@@ -25,6 +25,8 @@ import {
 import {
   clearUserCollection,
   getUserCollectionData,
+  getUserProfile,
+  saveUserProfile,
 } from "../services/firestoreData";
 
 import {
@@ -49,22 +51,30 @@ function Settings() {
     useState(true);
 
   useEffect(() => {
-    const saved = JSON.parse(
-      localStorage.getItem("settings")
-    );
+    (async () => {
+      try {
+        const profile = await getUserProfile();
 
-    if (saved && typeof saved.notifications === "boolean") {
-      setNotificationsEnabled(saved.notifications);
-    }
+        if (
+          profile &&
+          typeof profile.notificationsEnabled === "boolean"
+        ) {
+          setNotificationsEnabled(profile.notificationsEnabled);
+        }
+      } catch (error) {
+        // keep default (enabled) if the read fails
+      }
+    })();
   }, []);
 
-  const updateNotifications = (value) => {
+  const updateNotifications = async (value) => {
     setNotificationsEnabled(value);
 
-    localStorage.setItem(
-      "settings",
-      JSON.stringify({ notifications: value })
-    );
+    try {
+      await saveUserProfile({ notificationsEnabled: value });
+    } catch (error) {
+      toast.error(error.message);
+    }
   };
 
   // EXPORT / BACKUP DATA

@@ -461,6 +461,7 @@ body{
 
 .main-content{
   flex:1;
+  min-width:0;
   padding:25px;
 }
 
@@ -3465,18 +3466,23 @@ tr:hover{
 
 .filter-wrapper {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
   margin: 15px 0;
 }
 
 .filter-buttons {
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
 .filter-actions {
   display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .download-btn {

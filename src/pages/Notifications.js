@@ -46,22 +46,39 @@ function Notifications() {
   );
 
   const [tab, setTab] = useState("inbox");
+  const [readDateFilter, setReadDateFilter] = useState("");
 
-  const inbox = notifications
-    .filter((item) => !item.deleted)
-    .sort((a, b) => {
-      const aTime = a.createdAt?.toMillis
-        ? a.createdAt.toMillis()
-        : new Date(a.createdAt || 0).getTime();
-      const bTime = b.createdAt?.toMillis
-        ? b.createdAt.toMillis()
-        : new Date(b.createdAt || 0).getTime();
-      return bTime - aTime;
-    });
+  const sortByNewest = (a, b) => {
+    const aTime = a.createdAt?.toMillis
+      ? a.createdAt.toMillis()
+      : new Date(a.createdAt || 0).getTime();
+    const bTime = b.createdAt?.toMillis
+      ? b.createdAt.toMillis()
+      : new Date(b.createdAt || 0).getTime();
+    return bTime - aTime;
+  };
+
+  const unread = notifications
+    .filter((item) => !item.deleted && !item.read)
+    .sort(sortByNewest);
+
+  const readMessages = notifications
+    .filter((item) => !item.deleted && item.read)
+    .sort(sortByNewest);
+
+  const filteredReadMessages = readDateFilter
+    ? readMessages.filter((item) => {
+        const raw = item.createdAt?.toDate
+          ? item.createdAt.toDate()
+          : new Date(item.createdAt || 0);
+        const itemDate = raw.toISOString().slice(0, 10);
+        return itemDate === readDateFilter;
+      })
+    : readMessages;
 
   const trash = notifications.filter((item) => item.deleted);
 
-  const unreadCount = inbox.filter((item) => !item.read).length;
+  const unreadCount = unread.length;
 
   const markAsRead = async (id) => {
     try {
@@ -139,6 +156,13 @@ function Notifications() {
           </button>
 
           <button
+            className={tab === "read" ? "active-filter" : ""}
+            onClick={() => setTab("read")}
+          >
+            Read {readMessages.length > 0 ? `(${readMessages.length})` : ""}
+          </button>
+
+          <button
             className={tab === "trash" ? "active-filter" : ""}
             onClick={() => setTab("trash")}
           >
@@ -146,21 +170,33 @@ function Notifications() {
           </button>
         </div>
 
+        {tab === "read" && (
+          <div className="read-date-filter">
+            <label>Filter by date</label>
+            <input
+              type="date"
+              value={readDateFilter}
+              onChange={(e) => setReadDateFilter(e.target.value)}
+            />
+            {readDateFilter && (
+              <button
+                className="clear-date-btn"
+                onClick={() => setReadDateFilter("")}
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        )}
+
         <div className="table-card">
           {tab === "inbox" ? (
-            inbox.length === 0 ? (
-              <div className="no-data">No notifications yet</div>
+            unread.length === 0 ? (
+              <div className="no-data">No new notifications</div>
             ) : (
               <div className="notif-list">
-                {inbox.map((item) => (
-                  <div
-                    key={item.id}
-                    className={
-                      item.read
-                        ? "notif-item read"
-                        : "notif-item unread"
-                    }
-                  >
+                {unread.map((item) => (
+                  <div key={item.id} className="notif-item unread">
                     <div className="notif-icon">
                       {item.type === "budget_exceeded" ? (
                         <FaExclamationTriangle color="#ef4444" />
@@ -177,16 +213,53 @@ function Notifications() {
                     </div>
 
                     <div className="action-buttons">
-                      {!item.read && (
-                        <button
-                          className="edit-btn"
-                          title="Mark as read"
-                          onClick={() => markAsRead(item.id)}
-                        >
-                          <FaCheck />
-                        </button>
-                      )}
+                      <button
+                        className="edit-btn"
+                        title="Mark as read"
+                        onClick={() => markAsRead(item.id)}
+                      >
+                        <FaCheck />
+                      </button>
 
+                      <button
+                        className="delete-btn"
+                        title="Delete"
+                        onClick={() => softDelete(item.id)}
+                      >
+                        <FaTrash />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          ) : tab === "read" ? (
+            filteredReadMessages.length === 0 ? (
+              <div className="no-data">
+                {readDateFilter
+                  ? "No read messages on this date"
+                  : "No read messages yet"}
+              </div>
+            ) : (
+              <div className="notif-list">
+                {filteredReadMessages.map((item) => (
+                  <div key={item.id} className="notif-item read">
+                    <div className="notif-icon">
+                      {item.type === "budget_exceeded" ? (
+                        <FaExclamationTriangle color="#ef4444" />
+                      ) : (
+                        <FaExclamationTriangle color="#f59e0b" />
+                      )}
+                    </div>
+
+                    <div className="notif-body">
+                      <p>{item.message}</p>
+                      <span className="notif-date">
+                        {formatDate(item.createdAt)}
+                      </span>
+                    </div>
+
+                    <div className="action-buttons">
                       <button
                         className="delete-btn"
                         title="Delete"
@@ -310,6 +383,38 @@ function Notifications() {
             padding: 40px;
             font-weight: 600;
             color: ${darkMode ? "#94a3b8" : "#6b7280"};
+          }
+
+          .read-date-filter {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+          }
+
+          .read-date-filter label {
+            font-weight: 600;
+            font-size: 14px;
+            color: ${darkMode ? "#e2e8f0" : "#374151"};
+          }
+
+          .read-date-filter input[type="date"] {
+            padding: 8px 12px;
+            border-radius: 8px;
+            border: 1px solid ${darkMode ? "#334155" : "#d1d5db"};
+            background: ${darkMode ? "#1e293b" : "white"};
+            color: ${darkMode ? "#e2e8f0" : "#111827"};
+          }
+
+          .clear-date-btn {
+            padding: 8px 14px;
+            border-radius: 8px;
+            border: none;
+            background: ${darkMode ? "#334155" : "#e5e7eb"};
+            color: ${darkMode ? "#e2e8f0" : "#111827"};
+            font-weight: 600;
+            cursor: pointer;
           }
         `}
       </style>
